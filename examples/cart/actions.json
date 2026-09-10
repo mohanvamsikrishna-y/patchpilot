@@ -1,0 +1,11 @@
+[
+  {"name":"search","arguments":{"query":"calculate_total"}},
+  {"name":"read_file","arguments":{"path":"cart.py"}},
+  {"name":"read_file","arguments":{"path":"tests/test_cart.py"}},
+  {"name":"record_plan","arguments":{"plan":"The integer conversion drops cents. Preserve Decimal values, check rounding behavior against the regression suite, and repair midpoint rounding if needed."}},
+  {"name":"replace_text","arguments":{"path":"cart.py","old":"return int(amount)","new":"return round(amount, 2)","operation_id":"preserve-cents"}},
+  {"name":"run_tests","arguments":{}},
+  {"name":"replace_text","arguments":{"path":"cart.py","old":"return round(amount, 2)","new":"return amount.quantize(Decimal(\"0.01\"), rounding=ROUND_HALF_UP)","operation_id":"round-half-up"}},
+  {"name":"run_tests","arguments":{}},
+  {"name":"finish","arguments":{"summary":"Preserved cents and applied explicit Decimal half-up rounding. The first candidate still failed the midpoint regression. The repaired candidate passes all five tests without changing the suite."}}
+]

@@ -1,0 +1,42 @@
+name: Quality gates
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Unit and integration tests
+        run: python -m unittest discover -s tests -v
+      - name: Syntax check
+        run: python -m compileall -q patchpilot tests
+      - name: Golden maintenance tasks
+        run: python -m patchpilot eval
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evaluation-python-${{ matrix.python }}
+          path: |
+            runs/evaluation/**/run.json
+            runs/evaluation/**/trace.jsonl
+            runs/evaluation/**/patch.diff
+            runs/evaluation/**/report.html
+            runs/evaluation/evaluation.json
+  docker-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: docker build -f Dockerfile.runner -t patchpilot-runner:local .
+      - run: python -m patchpilot eval --runner docker

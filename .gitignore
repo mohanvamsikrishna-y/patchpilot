@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+!.env.example
+runs/
+*.egg-info/
+build/
+dist/
+.DS_Store
+
+# Personal preparation notes stay local
+docs/interview.md

@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PatchPilot · 20260910T001122Z-66a36314</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#101419;color:#e6edf3}
+*{box-sizing:border-box}body{max-width:1120px;margin:auto;padding:42px 26px 80px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #303944;padding-bottom:22px}
+.brand{font-size:22px;font-weight:750;letter-spacing:-.8px}.brand i{color:#92e4bd;font-style:normal}.tag{color:#92e4bd;border:1px solid #375d4e;padding:7px 12px;border-radius:24px;font-size:12px}
+.eyebrow{color:#92e4bd;text-transform:uppercase;letter-spacing:2px;font-size:11px;margin-top:42px}h1{font-size:clamp(28px,4vw,46px);letter-spacing:-1.5px;line-height:1.15;max-width:800px;margin:14px 0}p{color:#aab7c4;line-height:1.7}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:32px 0}.card{padding:22px;background:#192129;border:1px solid #303944;border-radius:12px}.card strong{display:block;font-size:27px;margin-top:10px}.label{font-size:12px;color:#aab7c4}section{margin-top:34px}h2{font-size:20px}pre{font:12px/1.65 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:#151c23;padding:20px;border-radius:9px;color:#c4d9c9}table{border-collapse:collapse;width:100%;text-align:left}td,th{padding:13px;border-bottom:1px solid #303944}th{color:#9eaebb;font-size:12px}details{border:1px solid #303944;border-radius:8px;margin:9px 0}summary{padding:15px;cursor:pointer;font-family:ui-monospace,monospace;font-size:13px}summary span{color:#82929f;margin-right:15px}summary b{float:right;color:#92e4bd;font-size:11px}details pre{margin:0;border-radius:0 0 8px 8px}footer{margin-top:40px;font-size:12px;color:#8393a2}@media(max-width:650px){.grid{grid-template-columns:repeat(2,1fr)}header{gap:15px}}
+</style>
+<header><div class="brand"><i>▧</i> PatchPilot</div><div class="tag">awaiting review</div></header>
+<div class="eyebrow">Maintenance run / scripted provider</div>
+<h1>Checkout loses cents and rounds midpoint prices incorrectly</h1>
+<p>Preserved cents and applied explicit Decimal half-up rounding. The first candidate still failed the midpoint regression. The repaired candidate passes all five tests without changing the suite.</p>
+<div class="grid"><div class="card"><span class="label">Tool steps</span><strong>10</strong></div>
+<div class="card"><span class="label">Test executions</span><strong>3</strong></div>
+<div class="card"><span class="label">Elapsed</span><strong>0.225s</strong></div>
+<div class="card"><span class="label">Estimated model cost</span><strong>$0.0000</strong></div></div>
+<p>This is a scripted run. Scripted runs use predefined actions and measure pipeline behavior, not model capability. Publication requires a separate human approval.</p>
+<section><h2>Implementation plan</h2><p>The integer conversion drops cents. Preserve Decimal values, check rounding behavior against the regression suite, and repair midpoint rounding if needed.</p></section>
+<section><h2>Validation history</h2><table><thead><tr><th>Attempt</th><th>Outcome</th><th>Tests passed</th><th>Duration</th></tr></thead><tbody><tr><td>1</td><td>Failed</td><td>1 / 5</td><td>0.04s</td></tr><tr><td>2</td><td>Failed</td><td>4 / 5</td><td>0.039s</td></tr><tr><td>3</td><td>Passed</td><td>5 / 5</td><td>0.04s</td></tr></tbody></table></section>
+<section><h2>Proposed patch</h2><pre>diff --git a/cart.py b/cart.py
+index 0dfa511..d8e3118 100644
+--- a/cart.py
++++ b/cart.py
+@@ -6,4 +6,4 @@ def calculate_total(prices, discount=0):
+     &quot;&quot;&quot;Return the discounted total, rounded to cents using half-up rounding.&quot;&quot;&quot;
+     subtotal = sum(Decimal(str(price)) for price in prices)
+     amount = subtotal * (Decimal(&quot;1&quot;) - Decimal(str(discount)))
+-    return int(amount)
++    return amount.quantize(Decimal(&quot;0.01&quot;), rounding=ROUND_HALF_UP)
+</pre></section>
+<section><h2>Tool trace</h2><details><summary><span>01</span> run_tests<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;exit_code&quot;: 1,
+  &quot;output&quot;: &quot;test_discount (test_cart.CheckoutTests) ... FAIL\ntest_empty_cart (test_cart.CheckoutTests) ... ok\ntest_half_up_rounding (test_cart.CheckoutTests) ... FAIL\ntest_preserves_cents (test_cart.CheckoutTests) ... FAIL\ntest_return_type (test_cart.CheckoutTests) ... FAIL\n\n======================================================================\nFAIL: test_discount (test_cart.CheckoutTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \&quot;&lt;demo-workspace&gt;/tests/test_cart.py\&quot;, line 14, in test_discount\n    self.assertEqual(calculate_total([\&quot;19.99\&quot;], \&quot;0.10\&quot;), Decimal(\&quot;17.99\&quot;))\nAssertionError: 17 != Decimal(&#x27;17.99&#x27;)\n\n======================================================================\nFAIL: test_half_up_rounding (test_cart.CheckoutTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \&quot;&lt;demo-workspace&gt;/tests/test_cart.py\&quot;, line 11, in test_half_up_rounding\n    self.assertEqual(calculate_total([\&quot;1.005\&quot;]), Decimal(\&quot;1.01\&quot;))\nAssertionError: 1 != Decimal(&#x27;1.01&#x27;)\n\n======================================================================\nFAIL: test_preserves_cents (test_cart.CheckoutTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \&quot;&lt;demo-workspace&gt;/tests/test_cart.py\&quot;, line 8, in test_preserves_cents\n    self.assertEqual(calculate_total([\&quot;12.99\&quot;, \&quot;4.50\&quot;]), Decimal(\&quot;17.49\&quot;))\nAssertionError: 17 != Decimal(&#x27;17.49&#x27;)\n\n======================================================================\nFAIL: test_return_type (test_cart.CheckoutTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \&quot;&lt;demo-workspace&gt;/tests/test_cart.py\&quot;, line 20, in test_return_type\n    self.assertIsInstance(calculate_total([\&quot;3\&quot;]), Decimal)\nAssertionError: 3 is not an instance of &lt;class &#x27;decimal.Decimal&#x27;&gt;\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nFAILED (failures=4)\n&quot;,
+  &quot;timed_out&quot;: false,
+  &quot;truncated&quot;: false,
+  &quot;duration_seconds&quot;: 0.04,
+  &quot;success&quot;: false,
+  &quot;total&quot;: 5,
+  &quot;passed&quot;: 1,
+  &quot;failed&quot;: 4,
+  &quot;skipped&quot;: 0,
+  &quot;runner&quot;: &quot;local&quot;,
+  &quot;tree_sha256&quot;: &quot;f574757d5cba130349298b0da463b17b4cca2cabb996cda1dfeb9217f2674ed4&quot;,
+  &quot;pass_rate&quot;: 0.2
+}</pre></details><details><summary><span>02</span> search<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;matches&quot;: [
+    {
+      &quot;path&quot;: &quot;cart.py&quot;,
+      &quot;line&quot;: 5,
+      &quot;text&quot;: &quot;def calculate_total(prices, discount=0):&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 3,
+      &quot;text&quot;: &quot;from cart import calculate_total&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 8,
+      &quot;text&quot;: &quot;        self.assertEqual(calculate_total([\&quot;12.99\&quot;, \&quot;4.50\&quot;]), Decimal(\&quot;17.49\&quot;))&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 11,
+      &quot;text&quot;: &quot;        self.assertEqual(calculate_total([\&quot;1.005\&quot;]), Decimal(\&quot;1.01\&quot;))&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 14,
+      &quot;text&quot;: &quot;        self.assertEqual(calculate_total([\&quot;19.99\&quot;], \&quot;0.10\&quot;), Decimal(\&quot;17.99\&quot;))&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 17,
+      &quot;text&quot;: &quot;        self.assertEqual(calculate_total([]), Decimal(\&quot;0.00\&quot;))&quot;
+    },
+    {
+      &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+      &quot;line&quot;: 20,
+      &quot;text&quot;: &quot;        self.assertIsInstance(calculate_total([\&quot;3\&quot;]), Decimal)&quot;
+    }
+  ],
+  &quot;truncated&quot;: false
+}</pre></details><details><summary><span>03</span> read_file<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;path&quot;: &quot;cart.py&quot;,
+  &quot;content&quot;: &quot;\&quot;\&quot;\&quot;Tiny checkout module with an intentionally seeded rounding bug.\&quot;\&quot;\&quot;\nfrom decimal import Decimal, ROUND_HALF_UP\n\n\ndef calculate_total(prices, discount=0):\n    \&quot;\&quot;\&quot;Return the discounted total, rounded to cents using half-up rounding.\&quot;\&quot;\&quot;\n    subtotal = sum(Decimal(str(price)) for price in prices)\n    amount = subtotal * (Decimal(\&quot;1\&quot;) - Decimal(str(discount)))\n    return int(amount)\n&quot;
+}</pre></details><details><summary><span>04</span> read_file<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;path&quot;: &quot;tests/test_cart.py&quot;,
+  &quot;content&quot;: &quot;from decimal import Decimal\nimport unittest\nfrom cart import calculate_total\n\n\nclass CheckoutTests(unittest.TestCase):\n    def test_preserves_cents(self):\n        self.assertEqual(calculate_total([\&quot;12.99\&quot;, \&quot;4.50\&quot;]), Decimal(\&quot;17.49\&quot;))\n\n    def test_half_up_rounding(self):\n        self.assertEqual(calculate_total([\&quot;1.005\&quot;]), Decimal(\&quot;1.01\&quot;))\n\n    def test_discount(self):\n        self.assertEqual(calculate_total([\&quot;19.99\&quot;], \&quot;0.10\&quot;), Decimal(\&quot;17.99\&quot;))\n\n    def test_empty_cart(self):\n        self.assertEqual(calculate_total([]), Decimal(\&quot;0.00\&quot;))\n\n    def test_return_type(self):\n        self.assertIsInstance(calculate_total([\&quot;3\&quot;]), Decimal)\n&quot;
+}</pre></details><details><summary><span>05</span> record_plan<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;plan&quot;: &quot;The integer conversion drops cents. Preserve Decimal values, check rounding behavior against the regression suite, and repair midpoint rounding if needed.&quot;
+}</pre></details><details><summary><span>06</span> replace_text<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;path&quot;: &quot;cart.py&quot;,
+  &quot;changed&quot;: true,
+  &quot;replayed&quot;: false
+}</pre></details><details><summary><span>07</span> run_tests<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;exit_code&quot;: 1,
+  &quot;output&quot;: &quot;test_discount (test_cart.CheckoutTests) ... ok\ntest_empty_cart (test_cart.CheckoutTests) ... ok\ntest_half_up_rounding (test_cart.CheckoutTests) ... FAIL\ntest_preserves_cents (test_cart.CheckoutTests) ... ok\ntest_return_type (test_cart.CheckoutTests) ... ok\n\n======================================================================\nFAIL: test_half_up_rounding (test_cart.CheckoutTests)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \&quot;&lt;demo-workspace&gt;/tests/test_cart.py\&quot;, line 11, in test_half_up_rounding\n    self.assertEqual(calculate_total([\&quot;1.005\&quot;]), Decimal(\&quot;1.01\&quot;))\nAssertionError: Decimal(&#x27;1.00&#x27;) != Decimal(&#x27;1.01&#x27;)\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nFAILED (failures=1)\n&quot;,
+  &quot;timed_out&quot;: false,
+  &quot;truncated&quot;: false,
+  &quot;duration_seconds&quot;: 0.039,
+  &quot;success&quot;: false,
+  &quot;total&quot;: 5,
+  &quot;passed&quot;: 4,
+  &quot;failed&quot;: 1,
+  &quot;skipped&quot;: 0,
+  &quot;runner&quot;: &quot;local&quot;,
+  &quot;tree_sha256&quot;: &quot;2baee86d7f5d6164d0e154e253ee134d8b38be78f692c2b5581771defee968b1&quot;,
+  &quot;pass_rate&quot;: 0.8
+}</pre></details><details><summary><span>08</span> replace_text<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;path&quot;: &quot;cart.py&quot;,
+  &quot;changed&quot;: true,
+  &quot;replayed&quot;: false
+}</pre></details><details><summary><span>09</span> run_tests<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;exit_code&quot;: 0,
+  &quot;output&quot;: &quot;test_discount (test_cart.CheckoutTests) ... ok\ntest_empty_cart (test_cart.CheckoutTests) ... ok\ntest_half_up_rounding (test_cart.CheckoutTests) ... ok\ntest_preserves_cents (test_cart.CheckoutTests) ... ok\ntest_return_type (test_cart.CheckoutTests) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nOK\n&quot;,
+  &quot;timed_out&quot;: false,
+  &quot;truncated&quot;: false,
+  &quot;duration_seconds&quot;: 0.04,
+  &quot;success&quot;: true,
+  &quot;total&quot;: 5,
+  &quot;passed&quot;: 5,
+  &quot;failed&quot;: 0,
+  &quot;skipped&quot;: 0,
+  &quot;runner&quot;: &quot;local&quot;,
+  &quot;tree_sha256&quot;: &quot;8771beeedcd84aa57f601ad0c1a22a96fbc282fd55a6a9983bcc2a268f8087b0&quot;,
+  &quot;pass_rate&quot;: 1.0
+}</pre></details><details><summary><span>10</span> finish<b>OK</b></summary><pre>{
+  &quot;ok&quot;: true,
+  &quot;status&quot;: &quot;awaiting_review&quot;,
+  &quot;summary&quot;: &quot;Preserved cents and applied explicit Decimal half-up rounding. The first candidate still failed the midpoint regression. The repaired candidate passes all five tests without changing the suite.&quot;
+}</pre></details></section>
+<footer>Run 20260910T001122Z-66a36314 · Base ba53847fc466 · Patch SHA-256 b3968bec1cafe044cfdf8ca3a88582b54b54bf43e6e987efa4f6a51963092a91<br>Local artifacts are editable. Hashes detect accidental changes, not malicious tampering.</footer></html>

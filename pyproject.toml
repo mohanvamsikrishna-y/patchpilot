@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patchpilot"
+version = "0.1.0"
+description = "A review-first software maintenance agent with reproducible repair traces"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+patchpilot = "patchpilot.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["patchpilot*"]

@@ -1,0 +1,9 @@
+[
+  {"name":"search","arguments":{"query":"slugify"}},
+  {"name":"read_file","arguments":{"path":"slug.py"}},
+  {"name":"read_file","arguments":{"path":"tests/test_slug.py"}},
+  {"name":"record_plan","arguments":{"plan":"The replacement handles single spaces only. Strip input and collapse whitespace with a regular expression while retaining lowercase behavior."}},
+  {"name":"replace_text","arguments":{"path":"slug.py","old":"return text.lower().replace(\" \", \"-\")","new":"return re.sub(r\"\\s+\", \"-\", text.strip().lower())","operation_id":"normalize-whitespace"}},
+  {"name":"run_tests","arguments":{}},
+  {"name":"finish","arguments":{"summary":"Normalized leading, trailing, and repeated whitespace. All five slug regressions pass with the original tests unchanged."}}
+]

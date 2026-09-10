@@ -1,0 +1,10 @@
+diff --git a/cart.py b/cart.py
+index 0dfa511..d8e3118 100644
+--- a/cart.py
++++ b/cart.py
+@@ -6,4 +6,4 @@ def calculate_total(prices, discount=0):
+     """Return the discounted total, rounded to cents using half-up rounding."""
+     subtotal = sum(Decimal(str(price)) for price in prices)
+     amount = subtotal * (Decimal("1") - Decimal(str(discount)))
+-    return int(amount)
++    return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
