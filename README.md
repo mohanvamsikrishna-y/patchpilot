@@ -1,5 +1,7 @@
 # PatchPilot
 
+[![Quality gates](https://github.com/mohanvamsikrishna-y/patchpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/mohanvamsikrishna-y/patchpilot/actions/workflows/ci.yml)
+
 ### Turn an issue into a tested patch, with evidence at every step.
 
 PatchPilot is a Python software maintenance agent prototype. It inspects a repository, records a plan, edits source code, runs regression tests, and requests human review of a validated patch. A separate command can publish an approved draft pull request.
@@ -74,7 +76,7 @@ One tool registry supports both direct agent execution and an MCP stdio server. 
 | CI | Python 3.10 and 3.12 jobs plus a Docker evaluation job |
 | Optional integrations | OpenAI Responses API, GitHub issue intake, approved draft PR publication |
 
-The optional integrations have mocked contract tests where documented. Live model behavior, remote PR creation, and Docker execution have not been verified in the initial local build. See [status](docs/status.md) for exact limits.
+The optional integrations have mocked contract tests where documented. Python 3.10 and 3.12 regression jobs and Docker evaluation pass in GitHub Actions. Live model behavior and remote PR creation by the maintenance adapter remain unverified. See [status](docs/status.md) for exact limits.
 
 ## Live model run
 
