@@ -1,4 +1,5 @@
 """CLI entry points. Offline demo needs only Python and Git."""
+
 import argparse
 import json
 import math
@@ -22,6 +23,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def progress(event):
+    """Print a short tool observation to stderr, leaving stdout for JSON results."""
     name, result = event["tool"], event["result"]
     detail = ""
     if name == "run_tests":
@@ -41,15 +43,31 @@ def progress(event):
     print(f"  {event['step']:02}  {name:<15} {detail}", file=sys.stderr, flush=True)
 
 
-def demo(task: str, output: Path, runner="local", provider_name="scripted", model=None,
-         on_event=None, budget=None):
+def demo(
+    task: str,
+    output: Path,
+    runner="local",
+    provider_name="scripted",
+    model=None,
+    on_event=None,
+    budget=None,
+):
+    """Create a retained demo checkout, choose a provider, and run the controller.
+
+    The model receives source, tests, and the issue. The scripted action file
+    stays outside that checkout and is loaded only by the scripted provider.
+    """
     fixture = ROOT / "examples" / task
     # The source survives the run so the interviewer can inspect and apply the patch.
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     source = Path(tempfile.mkdtemp(prefix=f"{task}-source-", dir=output))
-    shutil.copytree(fixture, source, dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "actions.json", "issue.md"))
+    shutil.copytree(
+        fixture,
+        source,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "actions.json", "issue.md"),
+    )
     init_repository(source)
     issue = (fixture / "issue.md").read_text()
     if provider_name == "scripted":
@@ -64,7 +82,14 @@ def demo(task: str, output: Path, runner="local", provider_name="scripted", mode
 
 
 def main(argv=None):
+    """Parse CLI options, dispatch one workflow, and return a process exit code.
+
+    Commands are grouped into demo/evaluation, live execution, local review,
+    MCP transport, and GitHub publication. A validated run exits with zero;
+    an incomplete run exits with one and retains its diagnostic artifacts.
+    """
     parser = argparse.ArgumentParser(description="PatchPilot maintenance agent")
+    # Configure command inputs here; implementation lives in focused modules.
     sub = parser.add_subparsers(dest="command", required=True)
     d = sub.add_parser("demo", help="Repair a seeded bug with a scripted or live Codex provider")
     d.add_argument("--provider", choices=["scripted", "codex"], default="scripted")
@@ -116,50 +141,98 @@ def main(argv=None):
         p.add_argument("--repo", required=True)
         if name == "publish":
             p.add_argument("--approve", required=True)
+    # Dispatch one command. The CLI never decides whether a patch is valid.
     args = parser.parse_args(argv)
     try:
         if hasattr(args, "run") and str(args.run) == "latest":
             args.run = Path(json.loads(Path("runs/latest.json").read_text())["artifacts"])
         if args.command == "demo":
             print(f"PatchPilot · {args.provider} provider · {args.runner} tests", file=sys.stderr)
-            result = demo(args.task, args.output, args.runner, args.provider, args.model,
-                          None if args.quiet else progress)
+            result = demo(
+                args.task,
+                args.output,
+                args.runner,
+                args.provider,
+                args.model,
+                None if args.quiet else progress,
+            )
         elif args.command == "eval":
-            results = [demo(task, args.output, args.runner, args.provider, args.model, progress) for task in ["cart", "slug"]]
+            results = [
+                demo(task, args.output, args.runner, args.provider, args.model, progress)
+                for task in ["cart", "slug"]
+            ]
             successful = sum(r["status"] == "awaiting_review" for r in results)
-            result = {"provider": args.provider, "tasks": len(results), "successful": successful,
-                      "success_rate": successful / len(results),
-                      "note": ("Scripted pipeline regression results" if args.provider == "scripted" else "Two seeded tasks only; not a general model benchmark"),
-                      "runs": [{"run_id": r["run_id"], "status": r["status"], "artifacts": r["artifacts"],
-                                "duration_seconds": r["duration_seconds"], "error": r["error"]} for r in results]}
+            result = {
+                "provider": args.provider,
+                "tasks": len(results),
+                "successful": successful,
+                "success_rate": successful / len(results),
+                "note": (
+                    "Scripted pipeline regression results"
+                    if args.provider == "scripted"
+                    else "Two seeded tasks only; not a general model benchmark"
+                ),
+                "runs": [
+                    {
+                        "run_id": r["run_id"],
+                        "status": r["status"],
+                        "artifacts": r["artifacts"],
+                        "duration_seconds": r["duration_seconds"],
+                        "error": r["error"],
+                    }
+                    for r in results
+                ],
+            }
             args.output.mkdir(parents=True, exist_ok=True)
             (args.output / "evaluation.json").write_text(json.dumps(result, indent=2) + "\n")
             print(json.dumps(result, indent=2))
             return 0 if successful == len(results) else 1
         elif args.command == "run":
             if args.runner == "local" and not args.trust_local_code:
-                raise PolicyError("Local tests execute repository code. Pass --trust-local-code or use Docker.")
+                raise PolicyError(
+                    "Local tests execute repository code. Pass --trust-local-code or use Docker."
+                )
             numbers = [args.max_steps, args.max_tokens, args.max_cost, args.test_timeout]
             if args.provider == "openai":
                 numbers.extend([args.input_rate, args.output_rate])
                 if not args.model:
                     raise ValueError("--model is required for the OpenAI provider")
             if any(not math.isfinite(n) or n <= 0 for n in numbers):
-                raise ValueError("Budget limits and live model rates must be positive finite numbers")
+                raise ValueError(
+                    "Budget limits and live model rates must be positive finite numbers"
+                )
             if args.issue:
                 issue_text = args.issue.read_text()
             else:
                 item = read_issue(args.github_issue)
                 issue_text = item["title"] + "\n\n" + item["body"]
-            budget = Budget(args.max_steps, args.max_tokens, args.max_cost, args.input_rate, args.output_rate)
-            provider = CodexProvider(issue_text, args.model) if args.provider == "codex" else OpenAIProvider(issue_text, args.model)
-            result = run(args.repo, issue_text, provider, args.output, args.runner, budget,
-                         None if args.quiet else progress, args.test_timeout)
+            budget = Budget(
+                args.max_steps, args.max_tokens, args.max_cost, args.input_rate, args.output_rate
+            )
+            provider = (
+                CodexProvider(issue_text, args.model)
+                if args.provider == "codex"
+                else OpenAIProvider(issue_text, args.model)
+            )
+            result = run(
+                args.repo,
+                issue_text,
+                provider,
+                args.output,
+                args.runner,
+                budget,
+                None if args.quiet else progress,
+                args.test_timeout,
+            )
         elif args.command == "doctor":
             checks = inspect_environment()
             for check in checks:
-                print(f"{'READY' if check['ready'] else 'OPTIONAL / MISSING':<20} {check['name']} · {check['detail']}")
-            print("Offline demo needs Python and Git. Live Codex mode additionally needs Codex sign-in.")
+                print(
+                    f"{'READY' if check['ready'] else 'OPTIONAL / MISSING':<20} {check['name']} · {check['detail']}"
+                )
+            print(
+                "Offline demo needs Python and Git. Live Codex mode additionally needs Codex sign-in."
+            )
             return 0 if all(c["ready"] for c in checks[:2]) else 1
         elif args.command == "review":
             result, patch = load_review(args.run)
@@ -181,7 +254,11 @@ def main(argv=None):
         else:
             print(publish(args.run.resolve(), args.repo, args.approve))
             return 0
-        print(json.dumps({key: result[key] for key in ["run_id", "status", "artifacts", "error"]}, indent=2))
+        print(
+            json.dumps(
+                {key: result[key] for key in ["run_id", "status", "artifacts", "error"]}, indent=2
+            )
+        )
         if getattr(args, "open", False):
             webbrowser.open((Path(result["artifacts"]) / "report.html").as_uri())
         print(f"Report · {result['artifacts']}/report.html", file=sys.stderr)

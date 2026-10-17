@@ -8,7 +8,7 @@ PatchPilot is a Python software maintenance agent prototype. It inspects a repos
 
 This repository reconstructs a lost earlier project. It represents the implementation and evidence available today. It does not contain recovered history or imply production deployment.
 
-[Architecture](docs/architecture.md) · [Demo walkthrough](docs/demo.md) · [Implementation status](docs/status.md)
+[Codebase walkthrough](docs/code-guide.md) · [Architecture](docs/architecture.md) · [Demo walkthrough](docs/demo.md) · [Implementation status](docs/status.md)
 
 ![PatchPilot live AI run report](docs/assets/live-report.png)
 

@@ -1,3 +1,5 @@
+"""Tool policy tests for repository boundaries, protected tests, edit replay, and validation freshness."""
+
 from pathlib import Path
 import tempfile
 import unittest
@@ -15,7 +17,8 @@ class ToolTests(unittest.TestCase):
         (self.root / "tests").mkdir()
         (self.root / "tests/test_calc.py").write_text(
             "import unittest\nfrom calc import add\nclass T(unittest.TestCase):\n"
-            "    def test_add(self): self.assertEqual(add(2, 3), 5)\n")
+            "    def test_add(self): self.assertEqual(add(2, 3), 5)\n"
+        )
         init_repository(self.root)
         self.tools = Toolset(self.root)
 
@@ -32,7 +35,9 @@ class ToolTests(unittest.TestCase):
         self.prepare()
         self.assertTrue(self.edit()["ok"])
         self.assertTrue(self.tools.call("run_tests", {})["success"])
-        self.assertEqual(self.tools.call("finish", {"summary": "Fixed addition"})["status"], "awaiting_review")
+        self.assertEqual(
+            self.tools.call("finish", {"summary": "Fixed addition"})["status"], "awaiting_review"
+        )
 
     def test_requires_inspection_and_plan(self):
         self.assertFalse(self.edit()["ok"])

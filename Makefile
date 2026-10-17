@@ -1,4 +1,4 @@
-.PHONY: demo demo-live doctor test eval check runner
+.PHONY: demo demo-live doctor test eval check runner format format-check
 
 demo:
 	python3 -m patchpilot demo
@@ -20,3 +20,9 @@ demo-live:
 
 doctor:
 	python3 -m patchpilot doctor
+
+format:
+	python3 -m black patchpilot tests
+
+format-check:
+	python3 -m black --check patchpilot tests

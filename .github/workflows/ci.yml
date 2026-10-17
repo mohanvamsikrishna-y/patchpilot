@@ -15,6 +15,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Install development tools
+        run: python -m pip install -e '.[dev]'
+      - name: Formatting check
+        run: python -m black --check patchpilot tests
       - name: Unit and integration tests
         run: python -m unittest discover -s tests -v
       - name: Syntax check

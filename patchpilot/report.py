@@ -1,23 +1,37 @@
 """Self-contained, escaped HTML reports with no remote assets or script execution."""
+
 import html
 import json
 from pathlib import Path
 
 
 def render(folder: Path, result: dict, events: list[dict], patch: str):
+    """Write a standalone HTML review report from recorded run evidence.
+
+    Repository text, issue text, and tool output are HTML-escaped before
+    interpolation. The report needs no external assets or JavaScript.
+    """
     esc = lambda value: html.escape(str(value))
     rows = []
     for event in events:
         detail = json.dumps(event.get("result", {}), indent=2)
-        rows.append(f'<details><summary><span>{event["step"]:02}</span> {esc(event["tool"])}'
-                    f'<b>{"OK" if event["result"].get("ok") else "ERROR"}</b></summary>'
-                    f'<pre>{esc(detail)}</pre></details>')
-    test_rows = "".join(f'<tr><td>{i + 1}</td><td>{"Passed" if t["success"] else "Failed"}</td>'
-                        f'<td>{t["passed"]} / {t["total"]}</td><td>{t["duration_seconds"]}s</td></tr>'
-                        for i, t in enumerate(result["test_runs"]))
+        rows.append(
+            f'<details><summary><span>{event["step"]:02}</span> {esc(event["tool"])}'
+            f'<b>{"OK" if event["result"].get("ok") else "ERROR"}</b></summary>'
+            f"<pre>{esc(detail)}</pre></details>"
+        )
+    test_rows = "".join(
+        f'<tr><td>{i + 1}</td><td>{"Passed" if t["success"] else "Failed"}</td>'
+        f'<td>{t["passed"]} / {t["total"]}</td><td>{t["duration_seconds"]}s</td></tr>'
+        for i, t in enumerate(result["test_runs"])
+    )
     budget = result["budget"]
-    cost = f"${budget['estimated_cost']:.4f}" if budget.get("estimated_cost") is not None else "Not reported"
-    page = f'''<!doctype html>
+    cost = (
+        f"${budget['estimated_cost']:.4f}"
+        if budget.get("estimated_cost") is not None
+        else "Not reported"
+    )
+    page = f"""<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PatchPilot · {esc(result['run_id'])}</title>
 <style>
@@ -40,5 +54,5 @@ a{{color:#92e4bd}}*{{box-sizing:border-box}}body{{max-width:1120px;margin:auto;p
 <section><h2>Review artifacts</h2><p><a href="patch.diff">Download patch</a> · <a href="run.json">Run metrics</a> · <a href="trace.jsonl">Tool trace</a> · <a href="pr.md">PR description</a></p><p>Reported tokens · {budget["input_tokens"]} input / {budget["output_tokens"]} output</p></section>
 <section><h2>Proposed patch</h2><pre>{esc(patch or 'No patch produced.')}</pre></section>
 <section><h2>Tool trace</h2>{''.join(rows)}</section>
-<footer>Run {esc(result['run_id'])} · Base {esc(result['base_commit'][:12])} · Patch SHA-256 {esc(result['patch_sha256'])}<br>Local artifacts are editable. Hashes detect accidental changes, not malicious tampering.</footer></html>'''
+<footer>Run {esc(result['run_id'])} · Base {esc(result['base_commit'][:12])} · Patch SHA-256 {esc(result['patch_sha256'])}<br>Local artifacts are editable. Hashes detect accidental changes, not malicious tampering.</footer></html>"""
     (folder / "report.html").write_text(page)

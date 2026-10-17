@@ -1,3 +1,5 @@
+"""MCP and Responses adapter contracts, exercised without a live model or network calls."""
+
 import io
 import json
 from pathlib import Path
@@ -17,30 +19,47 @@ class ProtocolTests(unittest.TestCase):
             root = Path(tmp)
             (root / "hello.py").write_text("hello = 'world'")
             server = Server(Toolset(root))
+
             def send(method, params=None):
-                return server.handle({"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}})
+                return server.handle(
+                    {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}
+                )
+
             self.assertIn("error", send("tools/list"))
             self.assertEqual(send("initialize")["result"]["protocolVersion"], "2025-11-25")
             names = [t["name"] for t in send("tools/list")["result"]["tools"]]
             self.assertIn("read_file", names)
             self.assertNotIn("replace_text", names)
-            result = send("tools/call", {"name": "read_file", "arguments": {"path": "hello.py"}})["result"]
+            result = send("tools/call", {"name": "read_file", "arguments": {"path": "hello.py"}})[
+                "result"
+            ]
             self.assertFalse(result["isError"])
             self.assertEqual(json.loads(result["content"][0]["text"]), result["structuredContent"])
             self.assertTrue(send("tools/call", {"name": "run_tests"})["result"]["isError"])
             self.assertEqual(send("no-such-method")["error"]["code"], -32601)
-            self.assertIsNone(server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
+            self.assertIsNone(
+                server.handle({"jsonrpc": "2.0", "method": "notifications/initialized"})
+            )
             self.assertIn("error", server.handle([]))
 
     @patch.dict("os.environ", {"OPENAI_API_KEY": "fake-test-key"})
     def test_responses_loop_preserves_reasoning_and_tool_call_output(self):
-        output = [{"type": "reasoning", "id": "rs_1", "summary": []},
-                  {"type": "function_call", "call_id": "call_1", "name": "search", "arguments": '{"query":"bug"}'}]
+        output = [
+            {"type": "reasoning", "id": "rs_1", "summary": []},
+            {
+                "type": "function_call",
+                "call_id": "call_1",
+                "name": "search",
+                "arguments": '{"query":"bug"}',
+            },
+        ]
         response = {"output": output, "usage": {"input_tokens": 100, "output_tokens": 20}}
         bodies = []
+
         def request(req, **kwargs):
             bodies.append(json.loads(req.data))
             return io.BytesIO(json.dumps(response).encode())
+
         with patch("urllib.request.urlopen", side_effect=request):
             provider = OpenAIProvider("Fix bug", "test-model")
             budget = Budget()
@@ -54,8 +73,14 @@ class ProtocolTests(unittest.TestCase):
     @patch.dict("os.environ", {"OPENAI_API_KEY": "fake-test-key"})
     def test_only_rate_limit_rejections_retried(self):
         rejected = urllib.error.HTTPError("url", 429, "rate limited", {}, None)
-        valid = {"output": [{"type": "function_call", "call_id": "c", "name": "run_tests", "arguments": "{}"}]}
-        with patch("urllib.request.urlopen", side_effect=[rejected, io.BytesIO(json.dumps(valid).encode())]) as request:
+        valid = {
+            "output": [
+                {"type": "function_call", "call_id": "c", "name": "run_tests", "arguments": "{}"}
+            ]
+        }
+        with patch(
+            "urllib.request.urlopen", side_effect=[rejected, io.BytesIO(json.dumps(valid).encode())]
+        ) as request:
             with patch("time.sleep"):
                 provider = OpenAIProvider("issue", "test-model")
                 provider.next(None, Budget())

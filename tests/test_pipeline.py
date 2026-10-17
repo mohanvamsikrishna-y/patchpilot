@@ -1,3 +1,5 @@
+"""Controller integration tests for golden tasks, budgets, and publication approval checks."""
+
 import hashlib
 import json
 from pathlib import Path
@@ -45,11 +47,25 @@ class PipelineTests(unittest.TestCase):
             (source / "x.py").write_text("x = 1\n")
             init_repository(source)
             (source / "tests").mkdir()
-            (source / "tests/test_x.py").write_text("import unittest\nclass T(unittest.TestCase):\n def test_ok(self): self.assertTrue(True)\n")
+            (source / "tests/test_x.py").write_text(
+                "import unittest\nclass T(unittest.TestCase):\n def test_ok(self): self.assertTrue(True)\n"
+            )
             from patchpilot.runtime import git
+
             git(source, "add", ".")
-            git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-m", "Add suite")
-            result = run(source, "fix", ScriptedProvider([]), Path(tmp) / "runs", budget=Budget(max_steps=1))
+            git(
+                source,
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "-m",
+                "Add suite",
+            )
+            result = run(
+                source, "fix", ScriptedProvider([]), Path(tmp) / "runs", budget=Budget(max_steps=1)
+            )
             self.assertEqual(result["status"], "budget_exhausted")
             self.assertTrue((Path(result["artifacts"]) / "trace.jsonl").exists())
 

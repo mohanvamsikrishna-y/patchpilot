@@ -1,3 +1,5 @@
+"""Local application and Codex adapter tests, including a mocked failed-then-repaired candidate."""
+
 import json
 from pathlib import Path
 import tempfile
@@ -67,20 +69,29 @@ class LiveWorkflowTests(unittest.TestCase):
             (root / "tests").mkdir()
             (root / "tests/test_calc.py").write_text(
                 "import unittest\nfrom calc import add\nclass T(unittest.TestCase):\n"
-                " def test_add(self): self.assertEqual(add(2, 3), 5)\n")
+                " def test_add(self): self.assertEqual(add(2, 3), 5)\n"
+            )
             init_repository(root)
             proposals = [
-                {"plan": "Try multiplication", "summary": "First candidate", "edits": [
-                    {"path": "calc.py", "old": "a - b", "new": "a * b"}]},
-                {"plan": "Fix addition after failure", "summary": "Addition fixed", "edits": [
-                    {"path": "calc.py", "old": "a * b", "new": "a + b"}]},
+                {
+                    "plan": "Try multiplication",
+                    "summary": "First candidate",
+                    "edits": [{"path": "calc.py", "old": "a - b", "new": "a * b"}],
+                },
+                {
+                    "plan": "Fix addition after failure",
+                    "summary": "Addition fixed",
+                    "edits": [{"path": "calc.py", "old": "a * b", "new": "a + b"}],
+                },
             ]
             with patch("shutil.which", return_value="codex"):
                 provider = CodexProvider("Fix addition")
             observed = []
+
             def propose(budget):
                 observed.append(json.loads(json.dumps(provider.feedback)))
                 return proposals.pop(0)
+
             with patch.object(provider, "propose", side_effect=propose):
                 result = run(root, "Fix addition", provider, Path(tmp) / "runs")
             self.assertEqual(result["status"], "awaiting_review")
@@ -95,7 +106,12 @@ class LiveWorkflowTests(unittest.TestCase):
         with patch("shutil.which", return_value="codex"):
             provider = CodexProvider("Fix addition")
         provider.files = {"calc.py": "return a - b"}
-        proposal = {"plan": "Fix", "summary": "Fixed", "edits": [{"path": "calc.py", "old": "a - b", "new": "a + b"}]}
+        proposal = {
+            "plan": "Fix",
+            "summary": "Fixed",
+            "edits": [{"path": "calc.py", "old": "a - b", "new": "a + b"}],
+        }
+
         def mock_command(argv, cwd, timeout, input_text):
             self.assertIn("--ignore-user-config", argv)
             self.assertEqual(argv[argv.index("--sandbox") + 1], "read-only")
@@ -103,8 +119,14 @@ class LiveWorkflowTests(unittest.TestCase):
             self.assertIn("multi_agent", argv)
             self.assertIn("Fix addition", input_text)
             Path(argv[argv.index("--output-last-message") + 1]).write_text(json.dumps(proposal))
-            return {"exit_code": 0, "timed_out": False, "output": json.dumps({
-                "type": "turn.completed", "usage": {"input_tokens": 80, "output_tokens": 30}})}
+            return {
+                "exit_code": 0,
+                "timed_out": False,
+                "output": json.dumps(
+                    {"type": "turn.completed", "usage": {"input_tokens": 80, "output_tokens": 30}}
+                ),
+            }
+
         budget = Budget()
         with patch("patchpilot.codex_provider.command", side_effect=mock_command):
             self.assertEqual(provider.propose(budget), proposal)
@@ -113,7 +135,9 @@ class LiveWorkflowTests(unittest.TestCase):
     def test_codex_timeout_is_not_retried(self):
         with patch("shutil.which", return_value="codex"):
             provider = CodexProvider("Fix bug")
-        with patch("patchpilot.codex_provider.command", return_value={"timed_out": True}) as execute:
+        with patch(
+            "patchpilot.codex_provider.command", return_value={"timed_out": True}
+        ) as execute:
             with self.assertRaisesRegex(RuntimeError, "timed out"):
                 provider.propose(Budget())
             self.assertEqual(execute.call_count, 1)
@@ -121,5 +145,10 @@ class LiveWorkflowTests(unittest.TestCase):
 
     def test_command_supports_stdin(self):
         import sys
-        result = command([sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"], Path.cwd(), input_text="hello")
+
+        result = command(
+            [sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"],
+            Path.cwd(),
+            input_text="hello",
+        )
         self.assertEqual(result["output"].strip(), "HELLO")
