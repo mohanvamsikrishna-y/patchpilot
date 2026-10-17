@@ -1,0 +1,10 @@
+diff --git a/slug.py b/slug.py
+index 251392c..979f744 100644
+--- a/slug.py
++++ b/slug.py
+@@ -4,4 +4,4 @@ import re
+ 
+ def slugify(text):
+     """Lowercase text and collapse surrounding or repeated whitespace."""
+-    return text.lower().replace(" ", "-")
++    return re.sub(r"\s+", "-", text.strip().lower())

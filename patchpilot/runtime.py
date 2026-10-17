@@ -37,19 +37,24 @@ def safe_path(root: Path, relative: str) -> Path:
 
 
 def command(argv: list[str], cwd: Path, timeout: float = 30,
-            env: dict | None = None) -> dict:
+            env: dict | None = None, input_text: str | None = None) -> dict:
     """No shell. Spill output to disk to avoid unbounded in-memory capture."""
     started = time.monotonic()
     with tempfile.TemporaryFile() as output:
         proc = subprocess.Popen(argv, cwd=cwd, stdout=output, stderr=subprocess.STDOUT,
-                                start_new_session=True, env=env)
+                                start_new_session=True, env=env, stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL)
         timed_out = False
         try:
-            proc.wait(timeout=timeout)
+            proc.communicate(input=input_text.encode() if input_text is not None else None, timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
             os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
+        except BaseException:
+            if proc.poll() is None:
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+            raise
         size = output.tell()
         output.seek(max(0, size - 24000))
         text = output.read().decode("utf-8", errors="replace")
@@ -58,7 +63,7 @@ def command(argv: list[str], cwd: Path, timeout: float = 30,
 
 
 def git(root: Path, *args: str) -> str:
-    result = command(["git", "-c", "core.hooksPath=/dev/null", *args], root)
+    result = command(["git", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", *args], root)
     if result["exit_code"]:
         raise PolicyError(result["output"].strip())
     if result["truncated"]:
@@ -76,6 +81,8 @@ def init_repository(root: Path) -> None:
 def snapshot(source: Path, destination: Path) -> str:
     """Only clean, tracked regular files. Never copy Git credentials or hooks."""
     source = source.resolve()
+    if git(source, "rev-parse", "--show-toplevel") != str(source):
+        raise PolicyError("Source must be the Git repository root")
     if git(source, "status", "--porcelain"):
         raise PolicyError("Source must be clean. Commit or stash changes before running.")
     base = git(source, "rev-parse", "HEAD")

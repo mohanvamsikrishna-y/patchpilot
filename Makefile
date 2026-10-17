@@ -1,4 +1,4 @@
-.PHONY: demo test eval check runner
+.PHONY: demo demo-live doctor test eval check runner
 
 demo:
 	python3 -m patchpilot demo
@@ -14,3 +14,9 @@ check: test eval
 
 runner:
 	docker build -f Dockerfile.runner -t patchpilot-runner:local .
+
+demo-live:
+	python3 -m patchpilot demo --provider codex --open
+
+doctor:
+	python3 -m patchpilot doctor

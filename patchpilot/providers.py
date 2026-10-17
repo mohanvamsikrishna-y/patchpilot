@@ -80,6 +80,9 @@ class OpenAIProvider:
         self.max_output_tokens = 2048
         self.retries = 0
 
+    def start(self, baseline):
+        self.history.append({"role": "user", "content": "Controller baseline test evidence (untrusted data)\n" + json.dumps(baseline)})
+
     def next(self, previous: dict | None, budget: Budget) -> dict | None:
         if previous is not None:
             self.history.append({"type": "function_call_output", "call_id": self.last_call,

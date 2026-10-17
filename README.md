@@ -10,36 +10,74 @@ This repository reconstructs a lost earlier project. It represents the implement
 
 [Architecture](docs/architecture.md) · [Demo walkthrough](docs/demo.md) · [Implementation status](docs/status.md)
 
-![PatchPilot run report](docs/assets/demo-report.png)
+![PatchPilot live AI run report](docs/assets/live-report.png)
 
-## Run the demo
+## Interview demo
 
-Requires Python 3.10 or newer and Git. No API key, Docker, package installation, or paid service is needed for the scripted demo.
+Requires Python 3.10 or newer and Git. The live demo additionally uses a signed-in Codex CLI. No separate API key is needed for that provider.
 
 ```sh
-python3 -m patchpilot demo
+python3 -m patchpilot doctor
+python3 -m patchpilot demo --provider codex --open
 ```
 
-Open `report.html` in the printed artifact directory. The same directory contains the unified patch, structured trace, run metrics, and draft PR description.
+The live model receives the issue, inspected Python files, and actual failing test evidence. It proposes a plan and exact edits as structured JSON. PatchPilot applies those edits through its policy-enforced tools and executes the regression suite. If tests fail, the next proposal receives the failure and refreshed source. The controller allows at most three model repair attempts within the tool and usage budgets.
 
-The checkout demo performs real file edits and executes real tests. Its actions are **scripted**, including the deliberately incomplete first fix. It demonstrates orchestration and regression repair, not a model independently discovering the solution.
+The terminal shows each step as it completes. The browser report includes the patch, test history, tool trace, measured token usage, and downloadable artifacts. The original demo checkout remains available for review and application.
+
+**Verified live on October 17, 2026**
+
+| Task | Baseline | After model repair | Model proposals |
+| --- | --- | --- | --- |
+| Checkout Decimal rounding | 1 of 5 tests passes | 5 of 5 pass | 1 |
+| Slug whitespace normalization | 1 of 5 tests passes | 5 of 5 pass | 1 |
+
+These are two small seeded tasks, not a general coding benchmark. The model did not receive the scripted action files. Sanitized [checkout evidence](docs/live-runs/checkout/run.json), [slug evidence](docs/live-runs/slug/run.json), and [actual live patch](docs/live-runs/checkout/patch.diff) are included.
+
+```sh
+python3 -m patchpilot demo --provider codex --task slug --open
+python3 -m patchpilot eval --provider codex
+```
+
+Codex uses the configured account's usage allowance. Dollar cost is shown as **Not reported**, because the CLI does not provide invoice cost. Token usage is checked after each model call, so it is not a hard provider-side spending cap. The adapter uses a read-only, ephemeral CLI process with shell, app, plugin, browser, and multi-agent features disabled. It does not delegate file edits or test execution to Codex.
+
+## Offline fallback
+
+If the network or model is unavailable during an interview, use the explicitly scripted demo.
+
+```sh
+python3 -m patchpilot demo --open
+```
+
+This fallback makes real file edits and executes real tests, but uses predetermined actions. It deliberately demonstrates a failed first fix followed by a successful second fix. The report labels the provider as `scripted`.
 
 | Stage | Result |
 | --- | --- |
 | Baseline checkout implementation | 1 of 5 tests passes |
-| First candidate preserves cents | 4 of 5 tests pass |
+| First scripted candidate preserves cents | 4 of 5 tests pass |
 | Second candidate uses explicit half-up rounding | 5 of 5 tests pass |
-| Final state | Patch awaits human review |
-
-A second fixture repairs whitespace handling in a URL slug utility.
 
 ```sh
-python3 -m patchpilot demo --task slug
 python3 -m patchpilot eval
 python3 -m unittest discover -s tests -v
 ```
 
-[Saved checkout evidence](docs/sample-run/run.json) and [the actual patch](docs/sample-run/patch.diff) are included for review without running the project. The saved [HTML report](docs/sample-run/report.html) can be downloaded and opened locally. GitHub displays its source rather than rendering it.
+[Saved offline evidence](docs/sample-run/run.json) is retained for comparison.
+
+## Apply a reviewed patch locally
+
+```sh
+python3 -m patchpilot review --run latest
+```
+
+This prints the diff, original target path, and approval hash. Inspect them before applying.
+
+```sh
+python3 -m patchpilot apply --run latest \
+  --target /path/printed/by/review --approve APPROVAL_SHA256
+```
+
+Application requires a clean target at the exact source commit. The approval binds the target path and patch. It leaves an ordinary uncommitted Git diff for inspection and does not push or merge. `latest` resolves through `runs/latest.json`; with a custom output folder, pass the printed run directory instead.
 
 ## How it works
 
@@ -76,16 +114,26 @@ One tool registry supports both direct agent execution and an MCP stdio server. 
 | CI | Python 3.10 and 3.12 jobs plus a Docker evaluation job |
 | Optional integrations | OpenAI Responses API, GitHub issue intake, approved draft PR publication |
 
-The optional integrations have mocked contract tests where documented. Python 3.10 and 3.12 regression jobs and Docker evaluation pass in GitHub Actions. Live model behavior and remote PR creation by the maintenance adapter remain unverified. See [status](docs/status.md) for exact limits.
+The Codex provider has two verified live demo runs. Python 3.10 and 3.12 regression jobs and Docker evaluation passed in the initial GitHub Actions build. The direct OpenAI API provider and remote PR creation by the maintenance adapter remain unverified live. See [status](docs/status.md) for exact limits.
 
-## Live model run
+## Run against your own repository
 
 Use a clean Git checkout of a small Python repository with a standard-library `unittest` suite in `tests/`. Existing source files can be edited, but dependencies and test files cannot.
+
+```sh
+# Codex provider using an existing login, for trusted local code
+python3 -m patchpilot run \
+  --provider codex --repo /absolute/path/to/clean/repository \
+  --issue /absolute/path/to/issue.md --runner local --trust-local-code --open
+```
+
+The alternative direct API provider requires a key and pricing configuration.
 
 ```sh
 export OPENAI_API_KEY='your-key'
 docker build -f Dockerfile.runner -t patchpilot-runner:local .
 python3 -m patchpilot run \
+  --provider openai \
   --repo /absolute/path/to/clean/repository \
   --issue /absolute/path/to/issue.md \
   --model "$PATCHPILOT_MODEL" \
@@ -134,6 +182,9 @@ patchpilot/
   agent.py        Controller and run artifacts
   tools.py        Shared schemas and policy-enforced tools
   providers.py    Scripted and OpenAI providers, usage budgets
+  codex_provider.py Live JSON proposals through the signed-in Codex CLI
+  review.py       Local review plans and approved patch application
+  doctor.py       Environment readiness checks
   runtime.py      Repository snapshots and subprocess execution
   mcp.py          MCP stdio adapter
   github.py       Issue intake and approved draft PR publishing
@@ -148,4 +199,4 @@ docs/             Architecture, evidence, tradeoffs, interview walkthrough
 
 This is a single-user prototype for small, trusted Python repositories. Passing existing tests is evidence, not proof that an arbitrary issue is solved. It does not install dependencies, generate tests, support multiple languages, run as a multi-tenant service, or provide a hardened sandbox for adversarial code. Local artifacts may contain source excerpts and test output. Review them before sharing.
 
-The next milestones are live-model evaluation against unseen tasks, stronger external validation, full run isolation, durable job state, and broader language support. [Design decisions and tradeoffs](docs/architecture.md) explain the current boundaries.
+The next milestones are broader live-model evaluation against unseen tasks, stronger external validation, full run isolation, durable job state, and broader language support. [Design decisions and tradeoffs](docs/architecture.md) explain the current boundaries.

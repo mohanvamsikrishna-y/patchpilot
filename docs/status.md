@@ -16,7 +16,7 @@ The [first hosted CI run](https://github.com/mohanvamsikrishna-y/patchpilot/acti
 
 ## Implemented but not verified live
 
-- OpenAI model repair on an unseen repository. No live model call was made.
+- Direct OpenAI Responses API repair. The separate Codex CLI provider has been verified live on the seeded tasks described below.
 - GitHub issue intake and draft PR publication by the maintenance adapter.
 - Full interoperability testing with an external MCP client.
 
@@ -28,3 +28,14 @@ The [first hosted CI run](https://github.com/mohanvamsikrishna-y/patchpilot/acti
 - New-file creation, test generation, or held-out evaluator suites.
 - Automatic PR merging, webhook intake, persistent job queues, or a hosted dashboard.
 - Claims about the history, performance, or deployment of the lost project.
+
+## Live demo upgrade verified October 17, 2026
+
+- Live Codex repair of the checkout task, from 1 of 5 to 5 of 5 passing tests.
+- Live Codex repair of the slug task, from 1 of 5 to 5 of 5 passing tests.
+- Both live runs generated their own edits from issue text and inspected files, without scripted action files.
+- The checkout patch was applied through the local approval workflow and all five tests passed in that original demo checkout.
+- The behavioral suite now contains 29 passing tests, including a mocked two-attempt live-provider repair, CLI response parsing, application approval, stale target rejection, setup failures, and stdin handling.
+- Terminal progress, environment checks, persistent demo checkouts, latest-run lookup, downloadable report artifacts, and explicit unavailable-cost reporting are implemented.
+
+Sanitized live evidence is stored under `docs/live-runs/`. These two seeded tasks do not establish general autonomous repair accuracy. The live tests used the local test runner; Docker results are tracked separately through CI.

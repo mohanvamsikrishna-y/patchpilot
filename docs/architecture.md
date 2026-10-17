@@ -89,3 +89,19 @@ Golden tasks are scripted orchestration tests. Their success rate must not be pr
 ## Primary references
 
 The optional provider follows [OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling). The MCP adapter follows the [MCP tools specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools) and [stdio transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports).
+
+## Live Codex proposal adapter
+
+The Codex provider was added for an interview-ready live path using an existing CLI sign-in. It discovers up to 20 small Python files through PatchPilot tools, supplies their contents and the baseline to an ephemeral model process, and requests a JSON proposal. Each proposal contains a plan, summary, and one to eight exact replacements. Shell, app, plugin, browser, and multi-agent features are disabled for this process. The CLI runs in an empty temporary working directory with a read-only sandbox.
+
+PatchPilot executes the proposal through the same policy-enforced tool registry used by the direct API provider. A failed candidate triggers fresh reads and another model proposal with failure evidence. Successful tests still require the controller's current-tree validation before review. Model-generated edits are not accepted directly into the user's checkout.
+
+The adapter limits attempts and request duration, preflights a conservative input estimate, and records CLI token usage. Token limits are checked after each request as well. The CLI provides neither an enforceable per-call output-token cap through this adapter nor invoice cost, so the report explicitly marks monetary cost unavailable. It does not claim a hard spend guarantee.
+
+The [Codex noninteractive command reference](https://learn.chatgpt.com/docs/developer-commands#codex-exec) documents JSON events, schema-constrained output, ephemeral sessions, and sandbox options. This adapter was verified with Codex CLI 0.147.0.
+
+## Local application
+
+The `review` command binds a patch hash, source commit, and target path into an approval plan. `apply` rechecks target cleanliness and exact source commit, verifies that Git can apply the patch, then applies it without creating a commit or pushing. A receipt is stored in the run folder. This is a local human review boundary, not authenticated multi-user authorization.
+
+Interrupted, setup-failed, and budget-exhausted runs retain a report and any available trace. Missing or unexecutable baseline tests stop the controller before a model request. Original demo checkouts are retained so the entire review and application workflow can be shown during a call.

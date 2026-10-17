@@ -1,24 +1,60 @@
-# Five-minute demo
+# Five-minute live demo
 
-Start with the README and its architecture diagram. Then run the checkout fixture.
+## Prepare before the call
 
-```sh
-python3 -m patchpilot demo
-```
-
-Open `report.html` from the printed output directory. Explain that this is a scripted fixture used to test the maintenance pipeline reliably without an API key.
-
-Show the validation history. The original implementation converts a Decimal total to an integer and loses cents. The first edit switches to `round`, which still fails the midpoint case. The second edit uses `quantize` with explicit half-up rounding. All five tests then pass.
-
-Open `patch.diff`. Only `cart.py` changes. Open `trace.jsonl` to show the file reads, plan, edits, failed observation, repair, and successful review request. Open `run.json` to show the measured timings and zero model usage for the scripted run.
-
-Then show `tests/test_tools.py`. Point out the test for stale validation, the protected test path, the timeout case, and operation ID replay. These explain why the controller is more than a prompt around a shell command.
+Open a terminal in the PatchPilot repository. Run the readiness check.
 
 ```sh
-python3 -m unittest discover -s tests -v
-python3 -m patchpilot eval
+python3 -m patchpilot doctor
 ```
 
-Close by explaining the live provider and publication boundary. The live adapter chooses its own tool calls. It needs an API key and has not been measured in the initial build. The publication command needs an explicit hash of the reviewed plan and creates a draft PR.
+Python and Git are required. For live AI repair, Codex sign-in must show ready. GitHub and Docker are optional for the bundled local demo. If needed, sign in with `codex login` before the interview. Do not display authentication files or API keys.
 
-Do not show a scripted run as an autonomous model result. Do not call a local test run a Docker run. The report labels the provider and runner so the distinction is visible.
+## Show a real model repair
+
+```sh
+python3 -m patchpilot demo --provider codex --open
+```
+
+Explain that the checkout function currently drops cents. The controller runs the original tests, reads source and tests through its tools, and sends those observations to Codex. Codex returns a structured proposal. PatchPilot validates the tool arguments, applies the edit, and runs tests again.
+
+The model may solve the task on its first attempt. Do not imply it made multiple attempts when it did not. The saved verified checkout run needed one proposal. If a candidate fails, the adapter refreshes source and passes failure evidence into another proposal, up to its limits.
+
+In the report, show the failing baseline, passing final suite, actual diff, and token counts. Cost is not reported by the Codex CLI, so the report does not invent a dollar figure.
+
+## Show the human review gate
+
+```sh
+python3 -m patchpilot review --run latest
+```
+
+Explain that the original checkout has not changed. The review prints a target path and approval hash. After reading the patch, substitute those values below.
+
+```sh
+python3 -m patchpilot apply --run latest \
+  --target /target/from/review --approve HASH_FROM_REVIEW
+```
+
+The change is applied as an uncommitted diff. It is not automatically published or merged. Open the target repository to show `git diff`. The application command refuses a dirty target, a changed patch, a changed base commit, or a wrong approval hash.
+
+## Show a different task
+
+```sh
+python3 -m patchpilot demo --provider codex --task slug --open
+```
+
+This repairs repeated whitespace, tabs, and newlines in a slug utility. The live model reads the task and current files. It does not read `actions.json`.
+
+## If the network fails
+
+```sh
+python3 -m patchpilot demo --open
+```
+
+Say that this is the scripted fallback. It exercises the same policy checks, edit tools, tests, report generation, and review gate. Its two predetermined candidates demonstrate failure feedback and repair. Use the saved live reports as evidence of previously measured AI runs, not as a claim that the offline fallback is live AI.
+
+## Explain the engineering
+
+Show `tests/test_live_workflow.py` for the failed-candidate repair test and approval checks. Show `codex_provider.py` for proposal generation, `tools.py` for policy, and `agent.py` for controller-owned validation.
+
+The practical scope is small Python repositories with a unittest suite in `tests/`. Docker mode isolates test subprocesses, not the entire agent. Passing tests do not prove correctness beyond the suite. GitHub publication is implemented separately but has not been verified live by this adapter.
