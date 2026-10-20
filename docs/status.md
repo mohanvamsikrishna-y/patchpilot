@@ -17,12 +17,11 @@ The [first hosted CI run](https://github.com/mohanvamsikrishna-y/patchpilot/acti
 ## Implemented but not verified live
 
 - Direct OpenAI Responses API repair. The separate Codex CLI provider has been verified live on the seeded tasks described below.
-- GitHub issue intake and draft PR publication by the maintenance adapter.
-- Full interoperability testing with an external MCP client.
+- Interoperability with additional named MCP applications. Independent-process stdio client testing is implemented.
 
 ## Explicitly outside this version
 
-- Full-agent container isolation or multi-tenant security.
+- Multi-tenant security or a hardened sandbox for hostile code.
 - Durable resume and exactly-once execution across process restarts.
 - Arbitrary language support, package installation, or dependency upgrades.
 - New-file creation, test generation, or held-out evaluator suites.
@@ -38,3 +37,18 @@ The [first hosted CI run](https://github.com/mohanvamsikrishna-y/patchpilot/acti
 - Terminal progress, environment checks, persistent demo checkouts, latest-run lookup, downloadable report artifacts, and explicit unavailable-cost reporting are implemented.
 
 Sanitized live evidence is stored under `docs/live-runs/`. These two seeded tasks do not establish general autonomous repair accuracy. The live tests used the local test runner; Docker results are tracked separately through CI.
+
+## GitHub workflow verified October 19, 2026
+
+- Real GitHub issue intake from [issue #1](https://github.com/mohanvamsikrishna-y/patchpilot/issues/1).
+- Live AI repair, moving from 1 of 5 to 5 of 5 passing tests without editing the tests.
+- Approval-gated publication through PatchPilot's own adapter into [draft PR #2](https://github.com/mohanvamsikrishna-y/patchpilot/pull/2).
+- The draft PR changes one source line on an isolated task branch and has a [passing remote regression check](https://github.com/mohanvamsikrishna-y/patchpilot/actions/runs/39361872362).
+- The same approved publication replays its saved receipt without creating another PR.
+- Target-branch binding, real Git publication and recovery against a local bare remote, canonical PR URLs, and separate CLI stderr are covered by tests.
+- MCP stdio was exercised by an independent client process, including initialization, discovery, and a tool call.
+- The current suite contains 35 behavioral and integration tests.
+
+Sanitized evidence for the full remote workflow is stored in `docs/github-run/`.
+
+`Dockerfile.agent` adds a container for the complete controller and tools, alongside the existing isolated test-runner image. CI exercises the full offline repair workflow with no network and a read-only container filesystem, and uploads the resulting evidence. Live direct-API runs in that image require a runtime key and have not been measured in this environment.

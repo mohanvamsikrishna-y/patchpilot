@@ -3,3 +3,8 @@
 runs
 .env
 __pycache__
+
+.env.*
+docs/interview.md
+*.pem
+*.key

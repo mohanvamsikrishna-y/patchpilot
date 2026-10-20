@@ -90,3 +90,46 @@ class ProtocolTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 OpenAIProvider("issue", "test-model").next(None, Budget())
             self.assertEqual(request.call_count, 1)
+
+
+class MCPStdioTests(unittest.TestCase):
+    def test_independent_process_client_discovers_and_reads_tools(self):
+        """Exercise the actual newline-delimited transport, not Server.handle alone."""
+        import subprocess
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "hello.py").write_text("answer = 42\n")
+            messages = [
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "independent-test-client", "version": "1"},
+                    },
+                },
+                {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                {
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {"name": "read_file", "arguments": {"path": "hello.py"}},
+                },
+            ]
+            process = subprocess.run(
+                [sys.executable, "-m", "patchpilot", "mcp", "--repo", str(root)],
+                input="".join(json.dumps(m) + "\n" for m in messages),
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            self.assertEqual(process.returncode, 0, process.stderr)
+            replies = [json.loads(line) for line in process.stdout.splitlines()]
+            self.assertEqual([r["id"] for r in replies], [1, 2, 3])
+            self.assertIn("read_file", [t["name"] for t in replies[1]["result"]["tools"]])
+            self.assertEqual(replies[2]["result"]["structuredContent"]["content"], "answer = 42\n")

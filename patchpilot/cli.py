@@ -12,6 +12,7 @@ import webbrowser
 from .agent import run
 from .codex_provider import CodexProvider
 from .doctor import inspect_environment
+from .demo_workspace import prepare, execute
 from .review import apply_plan, apply_patch, load_review
 from .github import publication_plan, publish, read_issue
 from .mcp import Server
@@ -99,6 +100,29 @@ def main(argv=None):
     d.add_argument("--task", choices=["cart", "slug"], default="cart")
     d.add_argument("--runner", choices=["local", "docker"], default="local")
     d.add_argument("--output", type=Path, default=Path("runs"))
+    github_demo = sub.add_parser(
+        "github-demo",
+        help="Create a task issue, run live AI repair, and prepare a reviewed draft PR",
+    )
+    github_demo.add_argument(
+        "--repo", required=True, help="GitHub repository for the isolated demo branch and issue"
+    )
+    github_demo.add_argument("--output", type=Path, required=True)
+    github_demo.add_argument("--task", choices=["cart", "slug"], default="cart")
+    github_demo.add_argument("--model")
+    github_demo.add_argument("--runner", choices=["local", "docker"], default="local")
+    github_demo.add_argument("--open", action="store_true")
+    prep = sub.add_parser(
+        "prepare-demo", help="Prepare an isolated task branch for GitHub issue-to-PR demos"
+    )
+    prep.add_argument("--task", choices=["cart", "slug"], default="cart")
+    prep.add_argument("--output", type=Path, required=True)
+    prep.add_argument("--github-repo")
+    prep.add_argument("--branch")
+    prep.add_argument("--push", action="store_true", help="Publish only the isolated task branch")
+    prep.add_argument(
+        "--create-issue", action="store_true", help="Create a GitHub issue for the published task"
+    )
     ev = sub.add_parser("eval", help="Evaluate both scripted golden tasks")
     ev.add_argument("--provider", choices=["scripted", "codex"], default="scripted")
     ev.add_argument("--model")
@@ -139,6 +163,7 @@ def main(argv=None):
         p = sub.add_parser(name)
         p.add_argument("--run", type=Path, required=True)
         p.add_argument("--repo", required=True)
+        p.add_argument("--base", help="Target branch; defaults to the remote default branch")
         if name == "publish":
             p.add_argument("--approve", required=True)
     # Dispatch one command. The CLI never decides whether a patch is valid.
@@ -156,6 +181,32 @@ def main(argv=None):
                 args.model,
                 None if args.quiet else progress,
             )
+        elif args.command == "github-demo":
+            result, workflow = execute(
+                args.task, args.output.resolve(), args.repo, args.model, args.runner, progress
+            )
+            print(json.dumps(workflow, indent=2))
+            if "publish_command" in workflow:
+                print(
+                    "Review the diff and report, then run this exact approved publication command:",
+                    file=sys.stderr,
+                )
+                print(workflow["publish_command"], file=sys.stderr)
+        elif args.command == "prepare-demo":
+            print(
+                json.dumps(
+                    prepare(
+                        args.task,
+                        args.output,
+                        args.github_repo,
+                        args.branch,
+                        args.push,
+                        args.create_issue,
+                    ),
+                    indent=2,
+                )
+            )
+            return 0
         elif args.command == "eval":
             results = [
                 demo(task, args.output, args.runner, args.provider, args.model, progress)
@@ -223,6 +274,7 @@ def main(argv=None):
                 budget,
                 None if args.quiet else progress,
                 args.test_timeout,
+                issue_url=args.github_issue,
             )
         elif args.command == "doctor":
             checks = inspect_environment()
@@ -249,10 +301,10 @@ def main(argv=None):
             Server(Toolset(args.repo, args.runner), args.allow_execution).serve()
             return 0
         elif args.command == "publish-plan":
-            print(json.dumps(publication_plan(args.run.resolve(), args.repo), indent=2))
+            print(json.dumps(publication_plan(args.run.resolve(), args.repo, args.base), indent=2))
             return 0
         else:
-            print(publish(args.run.resolve(), args.repo, args.approve))
+            print(publish(args.run.resolve(), args.repo, args.approve, args.base))
             return 0
         print(
             json.dumps(

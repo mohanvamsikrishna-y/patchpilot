@@ -79,6 +79,7 @@ For example, a test tool can return `ok = true` and `success = false`. That mean
 | [providers.py](../patchpilot/providers.py) | Budget accounting, scripted actions, and the direct OpenAI API provider |
 | [mcp.py](../patchpilot/mcp.py) | A synchronous MCP stdio adapter over the shared tools |
 | [github.py](../patchpilot/github.py) | GitHub issue intake and separately approved draft PR publication |
+| [demo_workspace.py](../patchpilot/demo_workspace.py) | Isolated task setup and GitHub workflow orchestration |
 | [doctor.py](../patchpilot/doctor.py) | Setup checks that do not expose credentials or invoke a model |
 | [pyproject.toml](../pyproject.toml) | Package metadata, console entry point, and optional development tools |
 | [ci.yml](../.github/workflows/ci.yml) | Regression tests, formatting, golden tasks, and Docker evaluation |
@@ -97,8 +98,14 @@ For example, a test tool can return `ok = true` and `success = false`. That mean
 
 ## Design limits worth understanding
 
-The tools' path checks and read-before-edit rules are useful controls, not a hardened sandbox. Local tests execute repository code with the user's permissions. Docker isolates test subprocesses, not the entire controller.
+The tools' path checks and read-before-edit rules are useful controls, not a hardened sandbox. Local tests execute repository code with the user's permissions. The test-runner image isolates test subprocesses. `Dockerfile.agent` runs the full controller and tools inside a container.
 
 Edit replay state is in memory. It is not durable exactly-once execution across restarts. Local artifact hashes detect accidental changes; they do not authenticate a malicious user who can rewrite those artifacts.
 
 The two live seeded tasks show that the integrated workflow works. They do not establish broad repair accuracy. Read [implementation status](status.md) before describing which integrations have been verified.
+
+## Follow a remote publication
+
+Start with `demo_workspace.execute` for the one-command GitHub workflow. Then read `github.publication_plan` and `github.publish`. The plan binds the repository, target branch, source commit, patch, and PR text. The publisher validates its approval before creating external changes.
+
+The [GitHub workflow guide](github-workflow.md) maps each CLI command to these functions. [test_github_workflow.py](../tests/test_github_workflow.py) tests real Git clone, apply, commit, push, and retry behavior against a local bare repository, with only GitHub's API responses mocked.

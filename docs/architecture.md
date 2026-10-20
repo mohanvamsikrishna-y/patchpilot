@@ -64,7 +64,7 @@ The unittest output parser supports this prototype's fixed runner. It is not a t
 
 Snapshots preserve tracked regular files and exclude Git internals, common secret paths, and unsupported files. The original checkout is not edited by the agent tools. Snapshots are not a security sandbox.
 
-Docker mode runs test subprocesses with a read-only workspace mount, no network, a non-root user, dropped capabilities, memory and process limits, and a timeout. It does not containerize the full controller. No Docker socket is mounted into the test container. Dependencies are limited to the runner image's standard library.
+Docker mode runs test subprocesses with a read-only workspace mount, no network, a non-root user, dropped capabilities, memory and process limits, and a timeout. That runner image does not containerize the full controller. `Dockerfile.agent` separately runs the entire controller and tools inside a container. No Docker socket is mounted into the test container. Dependencies are limited to the runner image's standard library.
 
 Local mode executes Python repository code as the current user. Environment filtering prevents routine API-key inheritance, but it cannot stop hostile code from reading host files. Local mode is for trusted code only.
 
@@ -92,7 +92,7 @@ The optional provider follows [OpenAI function calling](https://developers.opena
 
 ## Live Codex proposal adapter
 
-The Codex provider was added for an interview-ready live path using an existing CLI sign-in. It discovers up to 20 small Python files through PatchPilot tools, supplies their contents and the baseline to an ephemeral model process, and requests a JSON proposal. Each proposal contains a plan, summary, and one to eight exact replacements. Shell, app, plugin, browser, and multi-agent features are disabled for this process. The CLI runs in an empty temporary working directory with a read-only sandbox.
+The Codex provider was added for a live CLI path using an existing CLI sign-in. It discovers up to 20 small Python files through PatchPilot tools, supplies their contents and the baseline to an ephemeral model process, and requests a JSON proposal. Each proposal contains a plan, summary, and one to eight exact replacements. Shell, app, plugin, browser, and multi-agent features are disabled for this process. The CLI runs in an empty temporary working directory with a read-only sandbox.
 
 PatchPilot executes the proposal through the same policy-enforced tool registry used by the direct API provider. A failed candidate triggers fresh reads and another model proposal with failure evidence. Successful tests still require the controller's current-tree validation before review. Model-generated edits are not accepted directly into the user's checkout.
 
@@ -105,3 +105,17 @@ The [Codex noninteractive command reference](https://learn.chatgpt.com/docs/deve
 The `review` command binds a patch hash, source commit, and target path into an approval plan. `apply` rechecks target cleanliness and exact source commit, verifies that Git can apply the patch, then applies it without creating a commit or pushing. A receipt is stored in the run folder. This is a local human review boundary, not authenticated multi-user authorization.
 
 Interrupted, setup-failed, and budget-exhausted runs retain a report and any available trace. Missing or unexecutable baseline tests stop the controller before a model request. Original demo checkouts are retained so the entire review and application workflow can be shown during a call.
+
+## Remote workflow verification
+
+`demo_workspace.prepare` creates a clean task repository with a regression workflow. Explicit flags control whether it pushes the isolated branch and creates a GitHub issue. `execute` composes preparation, issue intake, live repair, and approval-plan generation for the `github-demo` command. It stops before publication so the generated patch can be reviewed.
+
+The publication plan can bind a non-default base branch. The publisher fetches that branch, verifies the tested source commit belongs to its history, applies the patch, and opens a draft PR. PR descriptions include the issue link, plan, baseline and final test counts, provider, run ID, and patch hash. GitHub CLI warnings are kept on stderr so they cannot corrupt JSON responses or saved result URLs.
+
+The integration suite uses an actual local bare Git remote to test branch publication, patch contents, the selected target, and retries after a lost receipt. A separate process acts as an independent MCP stdio client for initialization, tool discovery, and file reading.
+
+## Complete agent container
+
+The full agent image includes Python, Git, the controller, tools, and bundled tasks. Source checkouts can be mounted read-only with a separate writable artifacts mount. CI executes the scripted repair loop entirely inside that image with networking disabled and a read-only container root. A writable temporary filesystem supports short-lived subprocess and Git files.
+
+For live direct-API execution, supply the API key at runtime and allow network access to the model provider. Credentials are not included in the image. The Codex CLI adapter continues to use the host's existing sign-in and can use the separate test-runner image for its tests. These are two execution configurations with explicit boundaries.

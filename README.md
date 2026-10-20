@@ -4,13 +4,13 @@
 
 ### Turn an issue into a tested patch, with evidence at every step.
 
-PatchPilot is a Python software maintenance agent prototype. It inspects a repository, records a plan, edits source code, runs regression tests, and requests human review of a validated patch. A separate command can publish an approved draft pull request.
+PatchPilot is a software maintenance agent for Python repositories. It inspects a repository, records a plan, edits source code, runs regression tests, and requests human review of a validated patch. A separate command can publish an approved draft pull request.
 
 [Codebase walkthrough](docs/code-guide.md) · [Architecture](docs/architecture.md) · [Demo walkthrough](docs/demo.md) · [Implementation status](docs/status.md)
 
 ![PatchPilot live AI run report](docs/assets/live-report.png)
 
-## Interview demo
+## Quick start
 
 Requires Python 3.10 or newer and Git. The live demo additionally uses a signed-in Codex CLI. No separate API key is needed for that provider.
 
@@ -38,6 +38,21 @@ python3 -m patchpilot eval --provider codex
 ```
 
 Codex uses the configured account's usage allowance. Dollar cost is shown as **Not reported**, because the CLI does not provide invoice cost. Token usage is checked after each model call, so it is not a hard provider-side spending cap. The adapter uses a read-only, ephemeral CLI process with shell, app, plugin, browser, and multi-agent features disabled. It does not delegate file edits or test execution to Codex.
+
+## GitHub issue to draft PR
+
+The full GitHub path is verified with [issue #1](https://github.com/mohanvamsikrishna-y/patchpilot/issues/1) and [generated draft PR #2](https://github.com/mohanvamsikrishna-y/patchpilot/pull/2). PatchPilot read the real issue, obtained a live model repair, ran the unchanged tests, and published the approved patch. The [remote regression check passed](https://github.com/mohanvamsikrishna-y/patchpilot/actions/runs/39361872362). [Saved run evidence](docs/github-run/run.json) includes the baseline, final test counts, usage, and patch hash.
+
+To run the same workflow in your own repository, use a new output folder. This command creates an isolated task branch and GitHub issue, runs live AI repair, and prepares the exact PR publication command for review.
+
+```sh
+python3 -m patchpilot github-demo \
+  --repo YOUR_ACCOUNT/YOUR_REPO --output runs/github-session --open
+```
+
+After inspecting the generated diff and report, run the printed `publish` command to approve and create the draft PR. The task branch contains a minimal Python project and its own PR validation workflow. It does not replace the destination repository's main branch.
+
+[Step-by-step GitHub workflow](docs/github-workflow.md)
 
 ## Offline fallback
 
@@ -112,7 +127,7 @@ One tool registry supports both direct agent execution and an MCP stdio server. 
 | CI | Python 3.10 and 3.12 jobs plus a Docker evaluation job |
 | Optional integrations | OpenAI Responses API, GitHub issue intake, approved draft PR publication |
 
-The Codex provider has two verified live demo runs. Python 3.10 and 3.12 regression jobs and Docker evaluation passed in the initial GitHub Actions build. The direct OpenAI API provider and remote PR creation by the maintenance adapter remain unverified live. See [status](docs/status.md) for exact limits.
+Verified paths include live Codex repair, GitHub issue intake, approved draft PR publication, local patch application, and MCP stdio transport. Python 3.10 and 3.12 regression jobs and Docker evaluation run in GitHub Actions. See [status](docs/status.md) for verification details.
 
 ## Run against your own repository
 
@@ -146,6 +161,21 @@ Live runs default to Docker for **test subprocesses**. The Python controller and
 
 `--github-issue https://github.com/OWNER/REPO/issues/NUMBER` can replace `--issue`. It uses an existing GitHub CLI sign-in. Issue text and repository contents are treated as task data, not instructions to change the agent policy.
 
+## Run the complete agent in Docker
+
+`Dockerfile.agent` contains the controller, repository tools, Git, and Python test execution. This command runs the offline repair workflow with a read-only container filesystem and no network, retaining its patch and report on the host.
+
+```sh
+docker build -f Dockerfile.agent -t patchpilot-agent:local .
+mkdir -p runs/container
+docker run --rm --network=none --read-only --tmpfs /tmp \
+  --user "$(id -u):$(id -g)" \
+  --mount "type=bind,src=$(pwd)/runs/container,dst=/artifacts" \
+  patchpilot-agent:local demo --output /artifacts
+```
+
+The full image supports the direct API provider when a source checkout and issue file are mounted, an API key is supplied at runtime, and network access is enabled. The signed-in Codex CLI path runs on the host. The separate `Dockerfile.runner` remains available for isolating tests during host-controlled live runs.
+
 ## MCP server
 
 ```sh
@@ -158,13 +188,13 @@ The default server exposes repository reads and GitHub issue reads. `--allow-exe
 
 ## Review and publish
 
-Run this only against the GitHub repository from which the task source originated. Demo fixtures have local synthetic history and are intended for patch review, not remote publication.
+Run this only against the GitHub repository from which the task source originated. The `prepare-demo` and `github-demo` commands can publish a task baseline to an isolated branch for a complete remote workflow.
 
 ```sh
 python3 -m patchpilot publish-plan --run runs/RUN_ID --repo OWNER/REPO
 ```
 
-Inspect `publish-plan.json`, `patch.diff`, `pr.md`, and `report.html`. Then pass the plan's `approval_sha256` to authorize a draft PR.
+Use `--base BRANCH` on both commands when publishing to a non-default target branch. The approval hash includes that branch. Inspect `publish-plan.json`, `patch.diff`, `pr.md`, and `report.html`. Then pass the plan's `approval_sha256` to authorize a draft PR.
 
 ```sh
 python3 -m patchpilot publish \
@@ -183,6 +213,7 @@ patchpilot/
   codex_provider.py Live JSON proposals through the signed-in Codex CLI
   review.py       Local review plans and approved patch application
   doctor.py       Environment readiness checks
+  demo_workspace.py GitHub task setup and complete workflow orchestration
   runtime.py      Repository snapshots and subprocess execution
   mcp.py          MCP stdio adapter
   github.py       Issue intake and approved draft PR publishing

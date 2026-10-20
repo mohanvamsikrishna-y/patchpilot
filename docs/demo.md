@@ -1,5 +1,7 @@
 # Five-minute live demo
 
+For the complete issue-to-PR workflow, start with [the GitHub demo guide](github-workflow.md). The steps below demonstrate the local repair and review path.
+
 ## Prepare before the call
 
 Open a terminal in the PatchPilot repository. Run the readiness check.
@@ -57,4 +59,4 @@ Say that this is the scripted fallback. It exercises the same policy checks, edi
 
 Show `tests/test_live_workflow.py` for the failed-candidate repair test and approval checks. Show `codex_provider.py` for proposal generation, `tools.py` for policy, and `agent.py` for controller-owned validation.
 
-The practical scope is small Python repositories with a unittest suite in `tests/`. Docker mode isolates test subprocesses, not the entire agent. Passing tests do not prove correctness beyond the suite. GitHub publication is implemented separately but has not been verified live by this adapter.
+The practical scope is small Python repositories with a unittest suite in `tests/`. The test-runner image isolates test subprocesses; `Dockerfile.agent` also supports complete containerized runs. Passing tests do not prove correctness beyond the suite. GitHub issue intake and approved publication are verified in [draft PR #2](https://github.com/mohanvamsikrishna-y/patchpilot/pull/2). Follow the [GitHub workflow guide](github-workflow.md) to show that path.

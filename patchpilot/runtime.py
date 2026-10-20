@@ -50,15 +50,16 @@ def command(
     timeout: float = 30,
     env: dict | None = None,
     input_text: str | None = None,
+    merge_stderr: bool = True,
 ) -> dict:
     """No shell. Spill output to disk to avoid unbounded in-memory capture."""
     started = time.monotonic()
-    with tempfile.TemporaryFile() as output:
+    with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as error_output:
         proc = subprocess.Popen(
             argv,
             cwd=cwd,
             stdout=output,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.STDOUT if merge_stderr else error_output,
             start_new_session=True,
             env=env,
             stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
@@ -81,9 +82,13 @@ def command(
         size = output.tell()
         output.seek(max(0, size - 24000))
         text = output.read().decode("utf-8", errors="replace")
+        error_size = error_output.tell()
+        error_output.seek(max(0, error_size - 24000))
+        error_text = error_output.read().decode("utf-8", errors="replace")
     return {
         "exit_code": proc.returncode,
         "output": text,
+        "stderr": error_text,
         "timed_out": timed_out,
         "truncated": size > 24000,
         "duration_seconds": round(time.monotonic() - started, 3),

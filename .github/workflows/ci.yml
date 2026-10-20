@@ -44,3 +44,21 @@ jobs:
           python-version: '3.12'
       - run: docker build -f Dockerfile.runner -t patchpilot-runner:local .
       - run: python -m patchpilot eval --runner docker
+      - name: Build complete agent image
+        run: docker build -f Dockerfile.agent -t patchpilot-agent:local .
+      - name: Execute complete controller and tools inside Docker
+        run: |
+          mkdir -p runs/full-agent
+          docker run --rm --network=none --read-only --tmpfs /tmp \
+            --user "$(id -u):$(id -g)" \
+            --mount "type=bind,src=$(pwd)/runs/full-agent,dst=/artifacts" \
+            patchpilot-agent:local demo --output /artifacts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-agent-evidence
+          path: |
+            runs/full-agent/**/run.json
+            runs/full-agent/**/patch.diff
+            runs/full-agent/**/trace.jsonl
+            runs/full-agent/**/report.html

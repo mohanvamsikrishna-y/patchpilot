@@ -1,4 +1,4 @@
-.PHONY: demo demo-live doctor test eval check runner format format-check
+.PHONY: demo demo-live doctor test eval check runner format format-check agent-image
 
 demo:
 	python3 -m patchpilot demo
@@ -26,3 +26,6 @@ format:
 
 format-check:
 	python3 -m black --check patchpilot tests
+
+agent-image:
+	docker build -f Dockerfile.agent -t patchpilot-agent:local .

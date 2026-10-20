@@ -31,6 +31,9 @@ def render(folder: Path, result: dict, events: list[dict], patch: str):
         if budget.get("estimated_cost") is not None
         else "Not reported"
     )
+    issue_link = ""
+    if str(result.get("issue_url", "")).startswith("https://github.com/"):
+        issue_link = f'<p><a href="{esc(result["issue_url"])}">Source GitHub issue</a></p>'
     page = f"""<!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PatchPilot · {esc(result['run_id'])}</title>
@@ -43,6 +46,7 @@ a{{color:#92e4bd}}*{{box-sizing:border-box}}body{{max-width:1120px;margin:auto;p
 <header><div class="brand"><i>▧</i> PatchPilot</div><div class="tag">{esc(result['status'].replace('_',' '))}</div></header>
 <div class="eyebrow">Maintenance run / {esc(result['provider'])} provider</div>
 <h1>{esc(result['issue'].splitlines()[0].lstrip('# '))}</h1>
+{issue_link}
 <p>{esc(result.get('summary') or result.get('error') or 'Run stopped before review.')}</p>
 <div class="grid"><div class="card"><span class="label">Tool steps</span><strong>{budget['steps']}</strong></div>
 <div class="card"><span class="label">Test executions</span><strong>{len(result['test_runs'])}</strong></div>

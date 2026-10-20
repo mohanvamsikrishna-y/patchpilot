@@ -1,0 +1,14 @@
+{
+  "baseRefName": "patchpilot-demo/checkout-interview",
+  "checks": [
+    {
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/mohanvamsikrishna-y/patchpilot/actions/runs/39361872362/job/118429677654",
+      "name": "regression"
+    }
+  ],
+  "headRefName": "patchpilot/20261020T025834Z-95e19125",
+  "headRefOid": "05c84d3fa83f5a2d26df464a428950c1413ba888",
+  "isDraft": true,
+  "url": "https://github.com/mohanvamsikrishna-y/patchpilot/pull/2"
+}
