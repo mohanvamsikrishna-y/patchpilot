@@ -27,7 +27,6 @@ The [first hosted CI run](https://github.com/mohanvamsikrishna-y/patchpilot/acti
 - Arbitrary language support, package installation, or dependency upgrades.
 - New-file creation, test generation, or held-out evaluator suites.
 - Automatic PR merging, webhook intake, persistent job queues, or a hosted dashboard.
-- Claims about the history, performance, or deployment of the lost project.
 
 ## Live demo upgrade verified October 17, 2026
 
